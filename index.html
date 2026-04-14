@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>記數易 - 個人理財助手</title>
+    <style>
+        :root { --primary: #03A9F4; --bg: #E3F2FD; --card-bg: #ffffff; --text: #01579B; --danger: #FF5252; --success: #4CAF50; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg); margin: 0; padding: 20px 20px 100px 20px; color: var(--text); }
+        
+        /* 🔵 按照圖片設計的 Header */
+        .header { background: linear-gradient(135deg, #03A9F4, #81D4FA); padding: 30px 20px; border-radius: 25px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(3, 169, 244, 0.2); }
+        .header h1 { margin: 0; font-size: 1.5rem; }
+        
+        /* ⚠️ 圖片入面嘅黃色警告標語 */
+        .header-alert { color: #f4b400; font-weight: bold; font-size: 0.85rem; margin: 15px 0 0 0; line-height: 1.4; }
+
+        .glass-card { background: var(--card-bg); border-radius: 22px; padding: 18px; margin-bottom: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; font-size: 1rem; border-left: 4px solid var(--primary); padding-left: 10px; margin-bottom: 15px; }
+        
+        input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 12px; border: none; font-size: 1rem; box-sizing: border-box; }
+        input, select { background: #f1f8fc; border: 1px solid #e1f5fe; }
+        .btn-main { background: var(--primary); color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #0288D1; }
+        .btn-main:active { transform: translateY(2px); box-shadow: 0 2px 0 #0288D1; }
+        
+        /* 日曆篩選器樣式 */
+        .filter-box { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #E3F2FD; padding: 10px; border-radius: 15px; }
+        .filter-box input { margin-bottom: 0; flex: 1; }
+        .btn-clear { width: auto; padding: 8px 15px; background: #B0BEC5; color: white; margin-bottom: 0; font-size: 0.8rem; }
+
+        /* 彈窗 */
+        #welcomeOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .welcome-content { background: white; border-radius: 30px; padding: 30px; max-width: 400px; text-align: center; }
+        .alert-text { color: #D32F2F; font-weight: bold; margin: 15px 0; font-size: 0.9rem; }
+
+        /* 紀錄清單 */
+        .log-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+        .amt-neg { color: var(--danger); font-weight: bold; }
+        .amt-pos { color: var(--success); font-weight: bold; }
+        .hide { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="welcomeOverlay">
+    <div class="welcome-content">
+        <h2>歡迎使用 追數易 👋</h2>
+        <ul>
+            <li>🔒 <strong>100% 私隱：</strong> 數據只會儲喺呢部手機。我係唔會知道你入邊嘅所有數據，唔會知道你嘅IP位置，所以可以放心使用</li>
+            <li>🚫 <strong>不用網絡：</strong>呢個app可以離線使用</li>
+            <li>📦 <strong>備份：</strong> 記得定時匯出Excel備份！因為我唔會有你嘅data，所以清理咗Browser嘅快取之後，數據會消失</li>
+            <li> <strong>如果有數據遺失，我唔包㗎</li>
+        </ul>
+        <button id="welcomeBtn" class="btn-main" onclick="closeWelcome()" disabled style="opacity: 0.5;">開始使用 (7s)</button>
+    </div>
+</div>
+
+<div class="header">
+    <h1>📝 記數易 v12</h1>
+    <p class="header-alert">⚠️ 記得定時匯出Excel備份數據呀！因為如果你手痕去 Setting 清理咗 Browser 嘅快取，數據會消失</p>
+</div>
+
+<div class="glass-card">
+    <h3>💰 新增個人收支</h3>
+    <select id="meType">
+        <option value="expense">支出 (-)</option>
+        <option value="income">收入 (+)</option>
+    </select>
+    <input type="number" id="meAmt" placeholder="金額">
+    <input type="text" id="meReason" placeholder="備註 (如: 4月10號餐飯)">
+    <button class="btn-main" onclick="addMeLog()">儲存紀錄</button>
+</div>
+
+<div class="glass-card">
+    <h3>🗓️ 歷史紀錄查詢</h3>
+    <div class="filter-box">
+        <input type="date" id="dateFilter" onchange="updateUI()">
+        <button class="btn-clear" onclick="clearFilter()">顯示全部</button>
+    </div>
+    <div id="meLogList"></div>
+</div>
+
+<div class="glass-card" style="text-align:center;">
+    <h3>⚙️ 數據管理</h3>
+    <button class="btn-main" style="background:#B0BEC5; box-shadow: 0 4px 0 #78909C;" onclick="exportData()">📤 匯出備份 (CSV)</button>
+    <button class="btn-main" style="background:#FFEBEE; color:#D32F2F; box-shadow: 0 4px 0 #FFCDD2; margin-top:10px;" onclick="clearAllData()">⚠️ 清空數據</button>
+</div>
+
+<script>
+    let myLogs = JSON.parse(localStorage.getItem('myLogs_AccountEasy')) || [];
+
+    function saveAll() {
+        localStorage.setItem('myLogs_AccountEasy', JSON.stringify(myLogs));
+        updateUI();
+    }
+
+    function addMeLog() {
+        const amt = parseFloat(document.getElementById('meAmt').value);
+        const reason = document.getElementById('meReason').value;
+        const type = document.getElementById('meType').value;
+        if(!amt) return alert('請輸入金額！');
+        
+        // 儲存時加入完整的日期格式 (YYYY-MM-DD) 方便日後篩選
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+
+        myLogs.unshift({ amt, reason, type, date: dateStr });
+        document.getElementById('meAmt').value = "";
+        document.getElementById('meReason').value = "";
+        saveAll();
+    }
+
+    function updateUI() {
+        const logList = document.getElementById('meLogList');
+        const filterDate = document.getElementById('dateFilter').value;
+        logList.innerHTML = "";
+        
+        // 如果有揀日期，就篩選；冇就顯示最近 15 筆
+        let displayList = myLogs;
+        if (filterDate) {
+            displayList = myLogs.filter(l => l.date === filterDate);
+            if (displayList.length === 0) {
+                logList.innerHTML = `<p style="text-align:center; color:#999; padding:20px;">${filterDate} 冇紀錄喎 🤷‍♂️</p>`;
+                return;
+            }
+        } else {
+            displayList = myLogs.slice(0, 15);
+        }
+
+        displayList.forEach(l => {
+            logList.innerHTML += `
+                <div class="log-item">
+                    <div>
+                        <strong>${l.reason || '無備註'}</strong><br>
+                        <small style="color:#999;">${l.date}</small>
+                    </div>
+                    <span class="${l.type === 'expense' ? 'amt-neg' : 'amt-pos'}">
+                        ${l.type === 'expense' ? '-' : '+'}$${l.amt}
+                    </span>
+                </div>`;
+        });
+    }
+
+    function clearFilter() {
+        document.getElementById('dateFilter').value = "";
+        updateUI();
+    }
+
+    function exportData() {
+        let csv = "\uFEFF內容,金額,日期\n";
+        myLogs.forEach(l => csv += `${l.reason},${l.type === 'expense' ? -l.amt : l.amt},${l.date}\n`);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        link.download = "記數易_備份.csv";
+        link.click();
+    }
+
+    function clearAllData() {
+        if(confirm('⚠️ 確定要刪除所有紀錄嗎？')) {
+            localStorage.removeItem('myLogs_AccountEasy');
+            myLogs = [];
+            updateUI();
+        }
+    }
+
+    window.onload = function() {
+        if (!localStorage.getItem('accEasy_welcome_done')) {
+            const overlay = document.getElementById('welcomeOverlay');
+            const btn = document.getElementById('welcomeBtn');
+            overlay.style.display = 'flex';
+            let timeLeft = 7;
+            const timer = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) btn.innerText = `開始使用 (${timeLeft}s)`;
+                else { btn.innerText = "開始使用"; btn.disabled = false; btn.style.opacity = "1"; clearInterval(timer); }
+            }, 1000);
+        }
+        updateUI();
+    };
+
+    function closeWelcome() {
+        localStorage.setItem('accEasy_welcome_done', 'true');
+        document.getElementById('welcomeOverlay').style.display = 'none';
+    }
+</script>
+
+</body>
+</html>
